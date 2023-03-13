@@ -1,4 +1,4 @@
-import { FlatTreeControl } from '@angular/cdk/tree';
+import { CdkTreeModule, FlatTreeControl } from '@angular/cdk/tree';
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -6,34 +6,38 @@ import { MatTreeFlatDataSource, MatTreeModule, MatTreeFlattener } from '@angular
 import { ITreeViewNode, NodeType } from '../interfaces';
 import { MatIconModule } from '@angular/material/icon';
 import { ScrollingModule } from '@angular/cdk/scrolling';
+import { FolderService } from '../services';
 
 interface FlatNode {
   expandable: boolean;
   name: string;
   level: number;
+  type: NodeType;
 }
 
 @Component({
   selector: 'app-tree-view',
   standalone: true,
-  imports: [CommonModule, MatTreeModule, MatButtonModule, MatIconModule, ScrollingModule],
-  // providers: [MatButton, MatTree],
+  imports: [CommonModule, MatTreeModule, MatButtonModule, MatIconModule, ScrollingModule, CdkTreeModule],
   template: `
     <h3>Tree view component</h3>
-    <cdk-virtual-scroll-viewport [itemSize]="200">
-      <mat-tree [dataSource]="dataSource" [treeControl]="treeControl">
-        <mat-tree-node *matTreeNodeDef="let node" matTreeNodePadding>
-          <button mat-button>{{node.name}}</button>
-        </mat-tree-node>
-        <mat-tree-node *matTreeNodeDef="let node; when: hasChild" matTreeNodePadding>
-          <button mat-button matTreeNodeToggle>
-            <mat-icon class="mat-icon-rtl-mirror">
+    <cdk-virtual-scroll-viewport class="virtual-scroll-container" itemSize="18">
+      <ng-container *cdkVirtualFor="let node of dataSource">
+        <!-- Note that the [style.padding-left] is essentially what cdkTreeNodePadding is doing under the hood -->
+        <div class="node" [style.padding-left]="node.level * 24 + 'px'">
+          <!-- Note that treeControl.toggle(node) is essentially what cdkTreeNodeToggle is doing under the hood -->
+          <button mat-button (click)="treeControl.toggle(node)" *ngIf="hasChild(node.level, node)" (click)="selectFolder(node)">
+            <mat-icon>
               {{treeControl.isExpanded(node) ? 'folder_open' : 'folder'}}
             </mat-icon>
-            {{node.name}}
+            {{ node.name }}
           </button>
-        </mat-tree-node>
-      </mat-tree>
+          <button mat-button *ngIf="!hasChild(node.level, node)" [disabled]="!node.expandable">
+            <mat-icon>folder</mat-icon>
+            {{ node.name }}
+          </button>
+        </div>
+      </ng-container>
     </cdk-virtual-scroll-viewport>
   `,
   styleUrls: ['./tree-view.component.scss'],
@@ -44,10 +48,12 @@ export class TreeViewComponent implements OnInit {
     return {
       expandable: !!node.children && node.children.length > 0,
       name: node.name,
-      level: level
+      level: level,
+      type: node.type
     }
   }
   hasChild =  (_: number, node: FlatNode) => node.expandable;
+  depth = (node: FlatNode) => node.level;
   treeControl = new FlatTreeControl<FlatNode>(
     node => node.level,
     node => node.expandable
@@ -95,7 +101,13 @@ export class TreeViewComponent implements OnInit {
     }
   ];
 
+  constructor(private _folderService: FolderService) { }
+
   ngOnInit(): void {
     this.dataSource.data = this.data;
+  }
+
+  selectFolder(node: FlatNode) {
+    this._folderService.currentlySelectedNode.next(node);
   }
 }

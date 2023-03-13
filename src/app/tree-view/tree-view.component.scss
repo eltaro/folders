@@ -1,0 +1,13 @@
+.app-tree-node {
+    min-height: auto !important;
+    height: 26px;
+}
+
+.virtual-scroll-container {
+    height: 200px;
+    overflow: auto;
+}
+  
+cdk-tree-node {
+display: block;
+}
