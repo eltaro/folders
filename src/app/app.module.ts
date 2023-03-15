@@ -1,3 +1,5 @@
+import { CommonModule } from '@angular/common';
+import { HttpUrlEncodingCodec } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { FlexLayoutModule } from '@angular/flex-layout';
 import { MatButtonModule } from '@angular/material/button';
@@ -9,6 +11,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { DetailViewComponent } from './detail-view/detail-view.component';
+import { UrlDecoderPipe } from './pipes';
 import { TreeViewComponent } from './tree-view/tree-view.component';
 
 const COMPONENTS = [
@@ -19,8 +22,10 @@ const COMPONENTS = [
 @NgModule({
   declarations: [
     AppComponent,
+    UrlDecoderPipe
   ],
   imports: [
+    CommonModule,
     BrowserModule,
     AppRoutingModule,
     FlexLayoutModule,
@@ -30,7 +35,7 @@ const COMPONENTS = [
     BrowserAnimationsModule,
     ...COMPONENTS //Using stand-alone components
   ],
-  providers: [],
+  providers: [HttpUrlEncodingCodec],
   bootstrap: [AppComponent],
 })
 export class AppModule { }

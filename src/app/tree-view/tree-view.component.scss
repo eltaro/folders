@@ -9,5 +9,11 @@
 }
   
 cdk-tree-node {
-display: block;
+    display: block;
+}
+
+.virtual-scroll-container .node button {
+    overflow: hidden;
+    white-space: nowrap;
+    // text-overflow: ellipsis;
 }

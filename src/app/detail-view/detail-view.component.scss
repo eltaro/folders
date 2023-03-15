@@ -1,0 +1,10 @@
+.virtual-scroll-container {
+    height: 200px;
+    overflow: auto;
+}
+
+.virtual-scroll-container button {
+    overflow: hidden;
+    white-space: nowrap;
+    // text-overflow: ellipsis;
+}
