@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, ViewChild } from '@angular/core';
+import { FormControl } from '@angular/forms';
 import { NavigationEnd, Router } from '@angular/router';
-import { filter, map, of, pairwise } from 'rxjs';
+import { debounceTime, filter, map, merge, Observable, of, pairwise, startWith } from 'rxjs';
 import { DetailViewComponent } from './detail-view/detail-view.component';
 import { ITreeViewNode, NodeType } from './interfaces';
 import { TreeViewComponent } from './tree-view/tree-view.component';
@@ -10,9 +11,13 @@ import { TreeViewComponent } from './tree-view/tree-view.component';
   template: `
     <div class="wrapper">
       <h3 *ngIf="path$ | async as path">{{path[1] | urldecode }}</h3>
+      <mat-form-field appearance="outline">
+        <mat-label>Search</mat-label>
+        <input matInput [formControl]="searchFormControl"/> 
+      </mat-form-field>
       <div fxLayout="row" fxLayoutAlign="center center" class="container">
         <div fxFlex="50" class="tree-view">
-          <app-tree-view [path$]="path$" [data$]="data$"></app-tree-view>
+          <app-tree-view [path$]="path$" [data$]="data$" [search$]="search$"></app-tree-view>
         </div>
         <div fxFlex="50" class="detail-view">
           <app-detail-view></app-detail-view>
@@ -26,13 +31,24 @@ import { TreeViewComponent } from './tree-view/tree-view.component';
 export class AppComponent implements OnInit {
   title = 'folders';
 
-  path$ = this._router.events.pipe(
-    filter(e => e instanceof NavigationEnd),
+  pathWithoutPrevValue$: Observable<[string, string]> = this._router.events.pipe(
+    filter(event => event instanceof NavigationEnd),
+    map((navigationData) => ['', (navigationData as NavigationEnd).url])
+  );
+
+  pathWithPrevValue$: Observable<[string, string]> = this._router.events.pipe(
+    filter(event => event instanceof NavigationEnd),
     pairwise(),
     map((navigationData, _) => [(navigationData[0] as NavigationEnd).url, (navigationData[1] as NavigationEnd).url]),
   );
 
+  path$ = merge(this.pathWithoutPrevValue$, this.pathWithPrevValue$);
+
   data$ = of(source);
+
+  searchFormControl = new FormControl<string>('');
+
+  search$ = this.searchFormControl.valueChanges.pipe(startWith(''), debounceTime(300), map(s => (s ||= '').trim()))
 
   @ViewChild(TreeViewComponent, { static: true }) treeView!: TreeViewComponent;
   @ViewChild(DetailViewComponent, { static: true }) detailView!: DetailViewComponent;
@@ -61,6 +77,10 @@ const source: ITreeViewNode[] = [
             children: [
               {
                 name: 'They are here.bmp',
+                type: NodeType.File,
+              },
+              {
+                name: 'They are not joking.bmp',
                 type: NodeType.File,
               },
               {
@@ -97,10 +117,6 @@ const source: ITreeViewNode[] = [
               },
               {
                 name: 'Just chilling.bmp',
-                type: NodeType.File,
-              },
-              {
-                name: 'Some really long file name that doesn\'t properly fit into the container.bmp',
                 type: NodeType.File,
               }
             ]

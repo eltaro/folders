@@ -1,29 +1,28 @@
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { CdkTreeModule, FlatTreeControl } from '@angular/cdk/tree';
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, Input, OnDestroy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatTreeFlatDataSource, MatTreeFlattener, MatTreeModule } from '@angular/material/tree';
+import { MatTreeFlatDataSource, MatTreeFlattener } from '@angular/material/tree';
 import { RouterModule } from '@angular/router';
-import { BehaviorSubject, map, Observable, tap } from 'rxjs';
-import { IFlatNode, ITreeViewNode, NodeType } from '../interfaces';
+import { BehaviorSubject, first, map, Observable, of, Subject, switchMap, takeUntil, tap } from 'rxjs';
+import { IFlatNode, ITreeViewNode } from '../interfaces';
+import { UrlDecoderPipe } from '../pipes';
 
 @Component({
   selector: 'app-tree-view',
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, CdkTreeModule, ScrollingModule, MatInputModule, MatButtonModule, MatIconModule],
+  imports: [CommonModule, RouterModule, CdkTreeModule, ScrollingModule, MatButtonModule, MatIconModule],
+  providers: [UrlDecoderPipe],
   template: `
-    <!-- <form [formGroup]="form"></form> -->
     <ng-container *ngIf="data$ | async">
       <cdk-virtual-scroll-viewport class="virtual-scroll-container" itemSize="18">
         <ng-container *cdkVirtualFor="let node of dataSource">
-          <div *ngIf="node.type === 'Folder'" class="node" [style.padding-left]="node.level * 24 + 'px'">
+          <div *ngIf="node.type === 'Folder'" class="node" [style.padding-left]="node.level * 12 + 'px'" [ngClass]="{ 'final-node': (currentlySelectedNode$ | async)?.name === node.name }">
             <button mat-button
                     *ngIf="hasChild(node.level, node)"
-                    (click)="treeControl.toggle(node); this.currentlySelectedNode$.next(node);"
+                    (click)="treeControl.toggle(node); this.currentlySelectedNode$.next(node)"
                     [routerLink]="node.path">
               <mat-icon>
                 {{ treeControl.isExpanded(node) ? 'folder_open' : 'folder' }}
@@ -35,9 +34,9 @@ import { IFlatNode, ITreeViewNode, NodeType } from '../interfaces';
               {{ node.name }}
             </button>
           </div>
-          <div *ngIf="node.type === 'File'" class="node" [style.padding-left]="node.level * 24 + 'px'">
+          <div *ngIf="node.type === 'File'" class="node" [style.padding-left]="node.level * 12 + 'px'" [ngClass]="{ 'final-node': (currentlySelectedNode$ | async)?.name === node.name }">
             <button mat-button
-                    (click)="this.currentlySelectedNode$.next(node);"
+                    (click)="this.currentlySelectedNode$.next(node)"
                     [routerLink]="node.path">
               <mat-icon>file_open</mat-icon>
               {{ node.name }}
@@ -46,11 +45,12 @@ import { IFlatNode, ITreeViewNode, NodeType } from '../interfaces';
         </ng-container>
       </cdk-virtual-scroll-viewport>
     </ng-container>
+    <ng-container *ngIf="path$ | async"></ng-container>
   `,
   styleUrls: ['./tree-view.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class TreeViewComponent {
+export class TreeViewComponent implements OnDestroy {
   private _transformer = (node: ITreeViewNode, level: number) => {
     return {
       expandable: !!node.children && node.children.length > 0,
@@ -58,9 +58,12 @@ export class TreeViewComponent {
       level: level,
       type: node.type,
       path: node.path,
-      children: node.children
+      children: node.children,
+      final: false
     }
   }
+
+  private paths: string[] = [];
 
   treeControl = new FlatTreeControl<IFlatNode>(
     node => node.level,
@@ -83,7 +86,6 @@ export class TreeViewComponent {
 
     const result = this.addPathRecursively(data, currentPath);
 
-
     return result;
   }
 
@@ -92,8 +94,13 @@ export class TreeViewComponent {
       if (node.children) {
         const pathedChildren = this.addPathRecursively(node.children, `${currentPath}/${node.name}`);
 
+        this.paths.push(`${currentPath}/${node.name}`);
+
         return { ...node, path: `${currentPath}/${node.name}`, children: pathedChildren }
       }
+
+      this.paths.push(`${currentPath}/${node.name}`);
+
       return {...node, path: `${currentPath}/${node.name}`};
     });
 
@@ -103,12 +110,80 @@ export class TreeViewComponent {
   //Public API
   @Input() public data$: Observable<ITreeViewNode[]>;
 
-  @Input() public path$: Observable<string[]>;
+  @Input() public path$: Observable<[string, string]>;
+
+  @Input() public search$: Observable<string>;
 
   public currentlySelectedNode$ = new BehaviorSubject<IFlatNode | undefined>(undefined);
   //Public API end
 
+  destroyed$ = new Subject();
+
+  constructor(private _urlDecoder: UrlDecoderPipe) { }
+
   ngOnInit(): void {
     this.data$ = this.data$.pipe(map(d => this.generatePaths(d)), tap(d => this.dataSource.data = d));
+
+    //Expand tree by path and select the node mentioned in the last path segment
+    this.path$ = this.path$.pipe(tap(([_, current]) => {
+      const pathSegments = current.split('/').map(s => this._urlDecoder.transform(s));
+
+      const lastSegment = pathSegments[pathSegments.length-1];
+
+      this.treeControl.dataNodes.forEach(node => {
+        if (pathSegments.indexOf(node.name) === -1) {
+          return;
+        }
+        if (this.treeControl.isExpandable(node)) {
+          this.treeControl.expand(node);
+        }
+
+        if (node.name === lastSegment) {
+          this.currentlySelectedNode$.next(node);
+
+          node.final = true;
+        }
+      });
+    }));
+
+    // this.search$.pipe(switchMap((searchString => {
+    //   if (!searchString) {
+    //     console.log('exiting0');
+    //     return this.data$;
+    //   }
+
+    //   const relatedNodes = this.treeControl.dataNodes.filter(node => node.name.toLowerCase().includes(searchString.toLowerCase()));
+
+    //   if (relatedNodes.length === 0) {
+    //     console.log('exiting1');
+    //     return this.data$;
+    //   }
+
+    //   console.log(relatedNodes);
+
+    //   const nodesForTreeControl = new Map();
+
+    //   //Remove all duplicates paths by shuffling them into the map
+    //   relatedNodes.forEach(node => {
+    //     const path = node.path!.substring(1);
+    //     path.split('/').forEach(segment => nodesForTreeControl.set(segment, segment));
+    //   });
+
+    //   console.log(nodesForTreeControl);
+
+    //   const filteredNodes = this.treeControl.dataNodes.filter(node => nodesForTreeControl.has(node.name));
+
+    //   console.log(filteredNodes);
+
+    //   // // if (this.treeControl.isExpandable(targetNode)) {
+    //   // //   this.treeControl.expand(targetNode);
+    //   // // }
+
+    //   return of(filteredNodes);
+    // })));
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed$.next(0);
   }
 }

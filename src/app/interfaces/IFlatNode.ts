@@ -8,4 +8,5 @@ export interface IFlatNode {
     type: NodeType;
     children: ITreeViewNode[] | undefined;
     path: string | undefined;
+    final: boolean;
 }

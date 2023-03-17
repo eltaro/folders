@@ -15,5 +15,10 @@ cdk-tree-node {
 .virtual-scroll-container .node button {
     overflow: hidden;
     white-space: nowrap;
-    // text-overflow: ellipsis;
+    text-overflow: ellipsis;
+}
+
+.virtual-scroll-container .node.final-node {
+    background-color: rgb(245, 245, 245);
+    border-radius: 3px;
 }
