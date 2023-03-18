@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, ViewChild } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { NavigationEnd, Router } from '@angular/router';
-import { debounceTime, filter, map, merge, Observable, of, pairwise, startWith } from 'rxjs';
+import { BehaviorSubject, debounceTime, filter, map, merge, Observable, of, pairwise, startWith } from 'rxjs';
 import { DetailViewComponent } from './detail-view/detail-view.component';
 import { ITreeViewNode, NodeType } from './interfaces';
 import { TreeViewComponent } from './tree-view/tree-view.component';
@@ -44,7 +44,7 @@ export class AppComponent implements OnInit {
 
   path$ = merge(this.pathWithoutPrevValue$, this.pathWithPrevValue$);
 
-  data$ = of(source);
+  data$ = new BehaviorSubject<ITreeViewNode[]>(source);
 
   searchFormControl = new FormControl<string>('');
 

@@ -1,13 +1,13 @@
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { CdkTreeModule, FlatTreeControl } from '@angular/cdk/tree';
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, Input, OnDestroy } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnDestroy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTreeFlatDataSource, MatTreeFlattener } from '@angular/material/tree';
 import { RouterModule } from '@angular/router';
-import { BehaviorSubject, first, map, Observable, of, Subject, switchMap, takeUntil, tap } from 'rxjs';
-import { IFlatNode, ITreeViewNode } from '../interfaces';
+import { BehaviorSubject, combineLatest, filter, first, map, Observable, of, Subject, switchMap, takeUntil, tap } from 'rxjs';
+import { IFlatNode, ITreeViewNode, NodeType } from '../interfaces';
 import { UrlDecoderPipe } from '../pipes';
 
 @Component({
@@ -146,17 +146,64 @@ export class TreeViewComponent implements OnDestroy {
       });
     }));
 
-    // this.search$.pipe(switchMap((searchString => {
+    this.data$ = combineLatest([this.data$, this.search$]).pipe(
+      map(([nodes, searchString]) => {
+        if (!searchString) {
+          console.log('exiting0');
+          return nodes;
+        }
+  
+        const relatedNodes = this.treeControl.dataNodes.filter(node => node.name.toLowerCase().includes(searchString.toLowerCase()));
+  
+        if (relatedNodes.length === 0) {
+          console.log('exiting1');
+          return nodes;
+        }
+  
+        console.log(relatedNodes);
+  
+        const nodesForTreeControl = new Map();
+  
+        //Remove all duplicates paths by shuffling them into the map
+        relatedNodes.forEach(node => {
+          const path = node.path!.substring(1);
+          path.split('/').forEach(segment => nodesForTreeControl.set(segment, segment));
+        });
+  
+        console.log(nodesForTreeControl);
+  
+        // const filteredNodes = this.treeControl.dataNodes.filter(node => nodesForTreeControl.has(node.name));
+  
+        // console.log(filteredNodes);
+  
+        // this.treeControl.dataNodes = filteredNodes;
+
+        const result = this.filterNodesRecursively(Array.from(nodesForTreeControl.keys()), nodes);
+
+        console.log(result);
+  
+        return result;
+        
+        // filteredNodes.map(filteredNode => {
+        //   if (this.treeControl.isExpandable(filteredNode)) {
+        //     console.log('here');
+        //     this.treeControl.expand(filteredNode);
+        //   }
+        // });
+      }
+    ));
+
+    // this.search$.pipe(takeUntil(this.destroyed$)).subscribe(searchString => {
     //   if (!searchString) {
     //     console.log('exiting0');
-    //     return this.data$;
+    //     return;
     //   }
 
     //   const relatedNodes = this.treeControl.dataNodes.filter(node => node.name.toLowerCase().includes(searchString.toLowerCase()));
 
     //   if (relatedNodes.length === 0) {
     //     console.log('exiting1');
-    //     return this.data$;
+    //     return;
     //   }
 
     //   console.log(relatedNodes);
@@ -171,16 +218,36 @@ export class TreeViewComponent implements OnDestroy {
 
     //   console.log(nodesForTreeControl);
 
-    //   const filteredNodes = this.treeControl.dataNodes.filter(node => nodesForTreeControl.has(node.name));
+    //   // const filteredNodes = this.treeControl.dataNodes.filter(node => nodesForTreeControl.has(node.name));
 
-    //   console.log(filteredNodes);
+    //   // console.log(filteredNodes);
 
-    //   // // if (this.treeControl.isExpandable(targetNode)) {
-    //   // //   this.treeControl.expand(targetNode);
-    //   // // }
+    //   // this.treeControl.dataNodes = filteredNodes;
 
-    //   return of(filteredNodes);
-    // })));
+    //   this.filterNodesRecursively()
+      
+    //   // filteredNodes.forEach(filteredNode => {
+    //   //   if (this.treeControl.isExpandable(filteredNode)) {
+    //   //     console.log('here');
+    //   //     this.treeControl.expand(filteredNode);
+    //   //   }
+    //   // });
+
+    // });
+  }
+
+  filterNodesRecursively(paths: string[], nodes: ITreeViewNode[]): ITreeViewNode[] {
+    return nodes.filter(node => {
+      if (!!node.children && node.children.length > 0) {
+        const filteredChildren = this.filterNodesRecursively(paths, node.children);
+        
+        node.children = filteredChildren;
+      }
+
+      console.log(node.children);
+
+      return !!(paths.indexOf(node.name) > 0);
+    });
   }
 
   ngOnDestroy(): void {
