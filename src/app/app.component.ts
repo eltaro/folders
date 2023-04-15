@@ -1,23 +1,47 @@
-import { ChangeDetectionStrategy, Component, OnInit, ViewChild } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  NgZone,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { NavigationEnd, Router } from '@angular/router';
-import { BehaviorSubject, debounceTime, filter, map, merge, Observable, of, pairwise, startWith } from 'rxjs';
+import {
+  BehaviorSubject,
+  debounceTime,
+  filter,
+  map,
+  merge,
+  Observable,
+  of,
+  pairwise,
+  startWith,
+} from 'rxjs';
 import { DetailViewComponent } from './detail-view/detail-view.component';
 import { ITreeViewNode, NodeType } from './interfaces';
+import { Service } from './services/service';
 import { TreeViewComponent } from './tree-view/tree-view.component';
 
 @Component({
   selector: 'app-root',
+  providers: [Service],
+  styleUrls: ['./app.component.scss'],
   template: `
     <div class="wrapper">
-      <h3 *ngIf="path$ | async as path">{{path[1] | urldecode }}</h3>
+      <h3 *ngIf="path$ | async as path">{{ path[1] | urldecode }}</h3>
       <mat-form-field appearance="outline">
         <mat-label>Search</mat-label>
-        <input matInput [formControl]="searchFormControl"/> 
+        <input matInput [formControl]="searchFormControl" />
       </mat-form-field>
       <div fxLayout="row" fxLayoutAlign="center center" class="container">
         <div fxFlex="50" class="tree-view">
-          <app-tree-view [path$]="path$" [data$]="data$" [search$]="search$"></app-tree-view>
+          <app-tree-view
+            [path$]="path$"
+            [data$]="data$"
+            [search$]="search$"
+          ></app-tree-view>
         </div>
         <div fxFlex="50" class="detail-view">
           <app-detail-view></app-detail-view>
@@ -25,40 +49,53 @@ import { TreeViewComponent } from './tree-view/tree-view.component';
       </div>
     </div>
   `,
-  styleUrls: ['./app.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit {
   title = 'folders';
 
-  pathWithoutPrevValue$: Observable<[string, string]> = this._router.events.pipe(
-    filter(event => event instanceof NavigationEnd),
-    map((navigationData) => ['', (navigationData as NavigationEnd).url])
-  );
+  pathWithoutPrevValue$: Observable<[string, string]> =
+    this._router.events.pipe(
+      filter((event) => event instanceof NavigationEnd),
+      map((navigationData) => ['', (navigationData as NavigationEnd).url])
+    );
 
   pathWithPrevValue$: Observable<[string, string]> = this._router.events.pipe(
-    filter(event => event instanceof NavigationEnd),
+    filter((event) => event instanceof NavigationEnd),
     pairwise(),
-    map((navigationData, _) => [(navigationData[0] as NavigationEnd).url, (navigationData[1] as NavigationEnd).url]),
+    map((navigationData, _) => [
+      (navigationData[0] as NavigationEnd).url,
+      (navigationData[1] as NavigationEnd).url,
+    ])
   );
 
   path$ = merge(this.pathWithoutPrevValue$, this.pathWithPrevValue$);
 
   data$ = new BehaviorSubject<ITreeViewNode[]>(source);
 
+  products$ = this._service.products$;
+
   searchFormControl = new FormControl<string>('');
 
-  search$ = this.searchFormControl.valueChanges.pipe(startWith(''), debounceTime(300), map(s => (s ||= '').trim()))
+  search$ = this.searchFormControl.valueChanges.pipe(
+    startWith(''),
+    debounceTime(300),
+    map((s) => (s ||= '').trim())
+  );
 
   @ViewChild(TreeViewComponent, { static: true }) treeView!: TreeViewComponent;
-  @ViewChild(DetailViewComponent, { static: true }) detailView!: DetailViewComponent;
+  @ViewChild(DetailViewComponent, { static: true })
+  detailView!: DetailViewComponent;
 
   constructor(
-    private _router: Router
-  ) { }
+    private _router: Router,
+    private _zone: NgZone,
+    private _service: Service
+  ) {}
 
   ngOnInit() {
-    this.detailView.currentlySelectedNode$ = this.treeView.currentlySelectedNode$;
+    this.detailView.currentlySelectedNode$ =
+      this.treeView.currentlySelectedNode$;
   }
 }
 
@@ -118,8 +155,8 @@ const source: ITreeViewNode[] = [
               {
                 name: 'Just chilling.bmp',
                 type: NodeType.File,
-              }
-            ]
+              },
+            ],
           },
           {
             name: 'The son',
@@ -128,8 +165,8 @@ const source: ITreeViewNode[] = [
           {
             name: 'The daughter',
             type: NodeType.Folder,
-          }
-        ]
+          },
+        ],
       },
       {
         name: 'Eugens Birthday',
@@ -138,9 +175,7 @@ const source: ITreeViewNode[] = [
       {
         name: 'Our little party',
         type: NodeType.Folder,
-      }
-    ]
-  }
+      },
+    ],
+  },
 ];
-
-

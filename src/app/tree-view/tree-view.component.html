@@ -1,0 +1,54 @@
+<ng-container *ngIf="data$ | async">
+  <cdk-virtual-scroll-viewport class="virtual-scroll-container" itemSize="18">
+    <ng-container *cdkVirtualFor="let node of dataSource">
+      <div
+        *ngIf="node.type === 'Folder'"
+        class="node"
+        [style.padding-left]="node.level * 12 + 'px'"
+        [ngClass]="{
+          'final-node': (currentlySelectedNode$ | async)?.name === node.name
+        }"
+      >
+        <button
+          mat-button
+          *ngIf="hasChild(node.level, node)"
+          (click)="
+            treeControl.toggle(node); this.currentlySelectedNode$.next(node)
+          "
+          [routerLink]="node.path"
+        >
+          <mat-icon>
+            {{ treeControl.isExpanded(node) ? "folder_open" : "folder" }}
+          </mat-icon>
+          {{ node.name }}
+        </button>
+        <button
+          mat-button
+          *ngIf="!hasChild(node.level, node)"
+          [disabled]="!node.expandable"
+        >
+          <mat-icon>folder</mat-icon>
+          {{ node.name }}
+        </button>
+      </div>
+      <div
+        *ngIf="node.type === 'File'"
+        class="node"
+        [style.padding-left]="node.level * 12 + 'px'"
+        [ngClass]="{
+          'final-node': (currentlySelectedNode$ | async)?.name === node.name
+        }"
+      >
+        <button
+          mat-button
+          (click)="this.currentlySelectedNode$.next(node)"
+          [routerLink]="node.path"
+        >
+          <mat-icon>file_open</mat-icon>
+          {{ node.name }}
+        </button>
+      </div>
+    </ng-container>
+  </cdk-virtual-scroll-viewport>
+</ng-container>
+<ng-container *ngIf="path$ | async"></ng-container>

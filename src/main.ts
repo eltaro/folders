@@ -8,3 +8,5 @@ import { AppModule } from './app/app.module';
 platformBrowserDynamic().bootstrapModule(AppModule)
   .then(m => enableDebugTools(m.injector.get(ApplicationRef).components[0]))
   .catch(err => console.error(err));
+
+(window as any).__Zone_disable_requestAnimationFrame = true;
